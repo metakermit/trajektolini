@@ -301,6 +301,9 @@ def find_routes(
             # Skip ports on the destination island
             if dep_port_id in island_cluster:
                 continue
+            # Skip ports on any island — they can't be driven to from the mainland
+            if stop_island.get(dep_port_id):
+                continue
 
             # Drive origin -> departure port
             dep_drive = drive(origin, (dep_port.lat, dep_port.lon))
