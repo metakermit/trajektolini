@@ -1,0 +1,650 @@
+[
+  {
+    "code": "ANC",
+    "name": "ANCONA",
+    "country_code": "IT",
+    "island": "",
+    "lat": 43.6230654,
+    "lon": 13.5085718
+  },
+  {
+    "code": "BAR",
+    "name": "BAR",
+    "country_code": "ME",
+    "island": "",
+    "lat": 42.0979745,
+    "lon": 19.0954528
+  },
+  {
+    "code": "BRI",
+    "name": "BARI",
+    "country_code": "IT",
+    "island": "",
+    "lat": 41.1373111,
+    "lon": 16.8609512
+  },
+  {
+    "code": "BIO",
+    "name": "BIOGRAD",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.9393683,
+    "lon": 15.4397343
+  },
+  {
+    "code": "BOL",
+    "name": "BOL",
+    "country_code": "HR",
+    "island": "Brač",
+    "lat": 43.2610756,
+    "lon": 16.6575995
+  },
+  {
+    "code": "BOZ",
+    "name": "BOŽAVA ",
+    "country_code": "HR",
+    "island": "Dugi otok",
+    "lat": 44.139594,
+    "lon": 14.9078517
+  },
+  {
+    "code": "BRB",
+    "name": "BRBINJ",
+    "country_code": "HR",
+    "island": "Dugi otok",
+    "lat": 44.0841197,
+    "lon": 14.9964094
+  },
+  {
+    "code": "BRE",
+    "name": "BRESTOVA",
+    "country_code": "HR",
+    "island": "",
+    "lat": 45.1444467,
+    "lon": 14.2237346
+  },
+  {
+    "code": "BRG",
+    "name": "BRGULJE ",
+    "country_code": "HR",
+    "island": "Molat",
+    "lat": 44.225334,
+    "lon": 14.8387469
+  },
+  {
+    "code": "BRS",
+    "name": "BRŠANJ",
+    "country_code": "HR",
+    "island": "Iž",
+    "lat": 44.0241912,
+    "lon": 15.1464896
+  },
+  {
+    "code": "CRE",
+    "name": "CRES",
+    "country_code": "HR",
+    "island": "Cres",
+    "lat": 44.9573015,
+    "lon": 14.4069136
+  },
+  {
+    "code": "DRV",
+    "name": "DRVENIK",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.1547759,
+    "lon": 17.2489653
+  },
+  {
+    "code": "DMA",
+    "name": "DRVENIK MALI",
+    "country_code": "HR",
+    "island": "Drvenik Mali",
+    "lat": 43.4496145,
+    "lon": 16.0901478
+  },
+  {
+    "code": "DVE",
+    "name": "DRVENIK VELI",
+    "country_code": "HR",
+    "island": "Drvenik Veli",
+    "lat": 43.4501071,
+    "lon": 16.1447657
+  },
+  {
+    "code": "DBK",
+    "name": "DUBROVNIK",
+    "country_code": "HR",
+    "island": "",
+    "lat": 42.6578826,
+    "lon": 18.0857388
+  },
+  {
+    "code": "HVA",
+    "name": "HVAR",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.161739,
+    "lon": 16.392806
+  },
+  {
+    "code": "VRA",
+    "name": "HVAR (PORT VIRA)",
+    "country_code": "HR",
+    "island": "Hvar",
+    "lat": 43.1739411,
+    "lon": 16.5565161
+  },
+  {
+    "code": "ILO",
+    "name": "ILOVIK",
+    "country_code": "HR",
+    "island": "Ilovik",
+    "lat": 44.4617816,
+    "lon": 14.5490941
+  },
+  {
+    "code": "IST",
+    "name": "IST",
+    "country_code": "HR",
+    "island": "Ist",
+    "lat": 44.270871,
+    "lon": 14.7668335
+  },
+  {
+    "code": "IZM",
+    "name": "IŽ MALI",
+    "country_code": "HR",
+    "island": "Iž",
+    "lat": 44.0286,
+    "lon": 15.1402
+  },
+  {
+    "code": "IZV",
+    "name": "IŽ VELI",
+    "country_code": "HR",
+    "island": "Iž",
+    "lat": 44.0515882,
+    "lon": 15.1098252
+  },
+  {
+    "code": "JEL",
+    "name": "JELSA ",
+    "country_code": "HR",
+    "island": "Hvar",
+    "lat": 43.1620097,
+    "lon": 16.695454
+  },
+  {
+    "code": "KAP",
+    "name": "KAPRIJE",
+    "country_code": "HR",
+    "island": "Kaprije",
+    "lat": 43.6881798,
+    "lon": 15.7083778
+  },
+  {
+    "code": "KOL",
+    "name": "KOLOČEP",
+    "country_code": "HR",
+    "island": "Koločep",
+    "lat": 42.6798107,
+    "lon": 18.0045681
+  },
+  {
+    "code": "KLP",
+    "name": "KOLOČEP 1",
+    "country_code": "HR",
+    "island": "Koločep",
+    "lat": 42.6747961,
+    "lon": 18.0097474
+  },
+  {
+    "code": "DOM",
+    "name": "KORČULA (DOMINČE)",
+    "country_code": "HR",
+    "island": "KORČULA",
+    "lat": 42.9530375,
+    "lon": 17.1502367
+  },
+  {
+    "code": "KOS",
+    "name": "KOSIRAČA",
+    "country_code": "HR",
+    "island": "Ist",
+    "lat": 44.2793295,
+    "lon": 14.7571898
+  },
+  {
+    "code": "LOP",
+    "name": "LOPAR",
+    "country_code": "HR",
+    "island": "Rab",
+    "lat": 44.8377693,
+    "lon": 14.7213861
+  },
+  {
+    "code": "LOD",
+    "name": "LOPUD",
+    "country_code": "HR",
+    "island": "Lopud",
+    "lat": 42.6903476,
+    "lon": 17.9414727
+  },
+  {
+    "code": "MAK",
+    "name": "MAKARSKA",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.2939756,
+    "lon": 17.020242
+  },
+  {
+    "code": "MRA",
+    "name": "MALA RAVA",
+    "country_code": "HR",
+    "island": "Rava",
+    "lat": 44.0374725,
+    "lon": 15.0552326
+  },
+  {
+    "code": "MAL",
+    "name": "MALI LOŠINJ",
+    "country_code": "HR",
+    "island": "Lošinj",
+    "lat": 44.5352765,
+    "lon": 14.4660403
+  },
+  {
+    "code": "MAR",
+    "name": "MARTINŠĆICA",
+    "country_code": "HR",
+    "island": "Cres",
+    "lat": 44.8183777,
+    "lon": 14.3504816
+  },
+  {
+    "code": "MER",
+    "name": "MERAG ",
+    "country_code": "HR",
+    "island": "Cres",
+    "lat": 44.9801625,
+    "lon": 14.4483181
+  },
+  {
+    "code": "MOL",
+    "name": "MOLAT",
+    "country_code": "HR",
+    "island": "Molat",
+    "lat": 44.2123596,
+    "lon": 14.871777
+  },
+  {
+    "code": "NVA",
+    "name": "NOVALJA ",
+    "country_code": "HR",
+    "island": "Pag",
+    "lat": 44.5555802,
+    "lon": 14.8825263
+  },
+  {
+    "code": "OBO",
+    "name": "OBONJAN",
+    "country_code": "HR",
+    "island": "Obonjan",
+    "lat": 43.679127,
+    "lon": 15.7856388
+  },
+  {
+    "code": "OLI",
+    "name": "OLIB",
+    "country_code": "HR",
+    "island": "Olib",
+    "lat": 44.380266,
+    "lon": 14.7753842
+  },
+  {
+    "code": "ORE",
+    "name": "OREBIĆ",
+    "country_code": "HR",
+    "island": "",
+    "lat": 42.9769138,
+    "lon": 17.1832369
+  },
+  {
+    "code": "OSL",
+    "name": "OŠLJAK",
+    "country_code": "HR",
+    "island": "Ošljak",
+    "lat": 44.0755428,
+    "lon": 15.2102698
+  },
+  {
+    "code": "PLO",
+    "name": "PLOČE",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.0506175,
+    "lon": 17.4331356
+  },
+  {
+    "code": "POR",
+    "name": "POROZINA ",
+    "country_code": "HR",
+    "island": "Cres",
+    "lat": 45.1311399,
+    "lon": 14.2853639
+  },
+  {
+    "code": "PRA",
+    "name": "PRAPRATNO",
+    "country_code": "HR",
+    "island": "",
+    "lat": 42.8115078,
+    "lon": 17.6785819
+  },
+  {
+    "code": "PRE",
+    "name": "PREKO ",
+    "country_code": "HR",
+    "island": "Ugljan",
+    "lat": 44.07619,
+    "lon": 15.1945856
+  },
+  {
+    "code": "PRM",
+    "name": "PREMUDA",
+    "country_code": "HR",
+    "island": "Premuda",
+    "lat": 44.3371889,
+    "lon": 14.5928328
+  },
+  {
+    "code": "PRI",
+    "name": "PRIZNA",
+    "country_code": "HR",
+    "island": "",
+    "lat": 44.6019176,
+    "lon": 14.9702024
+  },
+  {
+    "code": "PRV",
+    "name": "PRVIĆ LUKA",
+    "country_code": "HR",
+    "island": "Prvić",
+    "lat": 43.7231178,
+    "lon": 15.7994748
+  },
+  {
+    "code": "RAB",
+    "name": "RAB",
+    "country_code": "HR",
+    "island": "Rab",
+    "lat": 44.7535189,
+    "lon": 14.7632535
+  },
+  {
+    "code": "RAV",
+    "name": "RAVA",
+    "country_code": "HR",
+    "island": "Rava",
+    "lat": 44.0230063,
+    "lon": 15.0594565
+  },
+  {
+    "code": "RKA",
+    "name": "RIJEKA",
+    "country_code": "HR",
+    "island": "",
+    "lat": 45.3236271,
+    "lon": 14.4395163
+  },
+  {
+    "code": "RIV",
+    "name": "RIVANJ",
+    "country_code": "HR",
+    "island": "Rivanj",
+    "lat": 44.153225,
+    "lon": 15.0302656
+  },
+  {
+    "code": "ROG",
+    "name": "ROGAČ ",
+    "country_code": "HR",
+    "island": "Šolta",
+    "lat": 43.3972331,
+    "lon": 16.3006217
+  },
+  {
+    "code": "SES",
+    "name": "SESTRUNJ",
+    "country_code": "HR",
+    "island": "Sestrunj",
+    "lat": 44.1384275,
+    "lon": 15.0102626
+  },
+  {
+    "code": "SIL",
+    "name": "SILBA",
+    "country_code": "HR",
+    "island": "Silba",
+    "lat": 44.3735371,
+    "lon": 14.6915973
+  },
+  {
+    "code": "SOB",
+    "name": "SOBRA",
+    "country_code": "HR",
+    "island": "Mljet",
+    "lat": 42.739279,
+    "lon": 17.6210979
+  },
+  {
+    "code": "SPL",
+    "name": "SPLIT",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.5051169,
+    "lon": 16.4420475
+  },
+  {
+    "code": "SRV",
+    "name": "SRAKANE VELE",
+    "country_code": "HR",
+    "island": "Srakane",
+    "lat": 44.5753729,
+    "lon": 14.3202341
+  },
+  {
+    "code": "STA",
+    "name": "STARI GRAD",
+    "country_code": "HR",
+    "island": "Hvar",
+    "lat": 43.1813607,
+    "lon": 16.5761216
+  },
+  {
+    "code": "SUC",
+    "name": "SUĆURAJ ",
+    "country_code": "HR",
+    "island": "Hvar",
+    "lat": 43.1255735,
+    "lon": 17.1862124
+  },
+  {
+    "code": "SUD",
+    "name": "SUĐURAĐ ",
+    "country_code": "HR",
+    "island": "Šipan",
+    "lat": 42.7098166,
+    "lon": 17.9114197
+  },
+  {
+    "code": "SUM",
+    "name": "SUMARTIN ",
+    "country_code": "HR",
+    "island": "Brač",
+    "lat": 43.2863691,
+    "lon": 16.8696301
+  },
+  {
+    "code": "SUP",
+    "name": "SUPETAR",
+    "country_code": "HR",
+    "island": "Brač",
+    "lat": 43.3858789,
+    "lon": 16.5548734
+  },
+  {
+    "code": "SUS",
+    "name": "SUSAK",
+    "country_code": "HR",
+    "island": "Susak",
+    "lat": 44.512533,
+    "lon": 14.3113232
+  },
+  {
+    "code": "SEP",
+    "name": "ŠEPURINE",
+    "country_code": "HR",
+    "island": "Prvić",
+    "lat": 43.7321654,
+    "lon": 15.7864093
+  },
+  {
+    "code": "SIB",
+    "name": "ŠIBENIK",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.7338926,
+    "lon": 15.8908106
+  },
+  {
+    "code": "TKO",
+    "name": "TKON",
+    "country_code": "HR",
+    "island": "Pašman",
+    "lat": 43.9240912,
+    "lon": 15.4186644
+  },
+  {
+    "code": "TRO",
+    "name": "TROGIR (SOLINE)",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.5164142,
+    "lon": 16.2497163
+  },
+  {
+    "code": "TRP",
+    "name": "TRPANJ",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.0096418,
+    "lon": 17.2678589
+  },
+  {
+    "code": "UBL",
+    "name": "UBLI ",
+    "country_code": "HR",
+    "island": "Lastovo",
+    "lat": 42.7477273,
+    "lon": 16.8233854
+  },
+  {
+    "code": "UNI",
+    "name": "UNIJE",
+    "country_code": "HR",
+    "island": "Unije",
+    "lat": 44.6361683,
+    "lon": 14.2462615
+  },
+  {
+    "code": "VAL",
+    "name": "VALBISKA ",
+    "country_code": "HR",
+    "island": "",
+    "lat": 45.0278678,
+    "lon": 14.4969966
+  },
+  {
+    "code": "VLU",
+    "name": "VELA LUKA",
+    "country_code": "HR",
+    "island": "Korčula",
+    "lat": 42.9597034,
+    "lon": 16.705943
+  },
+  {
+    "code": "VIS",
+    "name": "VIS",
+    "country_code": "HR",
+    "island": "Vis",
+    "lat": 43.061834,
+    "lon": 16.1841438
+  },
+  {
+    "code": "VOD",
+    "name": "VODICE",
+    "country_code": "HR",
+    "island": "",
+    "lat": 43.7551172,
+    "lon": 15.7749234
+  },
+  {
+    "code": "ZAD",
+    "name": "ZADAR ",
+    "country_code": "HR",
+    "island": "",
+    "lat": 44.1186175,
+    "lon": 15.223342
+  },
+  {
+    "code": "GAZ",
+    "name": "ZADAR (GAŽENICA)",
+    "country_code": "HR",
+    "island": "",
+    "lat": 44.1168594,
+    "lon": 15.2353257
+  },
+  {
+    "code": "ZAP",
+    "name": "ZAPUNTEL ",
+    "country_code": "HR",
+    "island": "Molat",
+    "lat": 44.2604545,
+    "lon": 14.7989763
+  },
+  {
+    "code": "ZLA",
+    "name": "ZLARIN",
+    "country_code": "HR",
+    "island": "Zlarin",
+    "lat": 43.6997444,
+    "lon": 15.8334236
+  },
+  {
+    "code": "ZVE",
+    "name": "ZVERINAC",
+    "country_code": "HR",
+    "island": "Zverinac",
+    "lat": 44.1603261,
+    "lon": 14.9156204
+  },
+  {
+    "code": "ZIG",
+    "name": "ŽIGLJEN ",
+    "country_code": "HR",
+    "island": "Pag",
+    "lat": 44.5806377,
+    "lon": 14.9486611
+  },
+  {
+    "code": "ZIR",
+    "name": "ŽIRJE",
+    "country_code": "HR",
+    "island": "Žirje",
+    "lat": 43.6621196,
+    "lon": 15.6561111
+  }
+]

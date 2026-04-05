@@ -72,8 +72,8 @@ def load_gtfs(path: Path) -> dict:
             with zf.open(name) as f:
                 data[name] = list(csv.DictReader(io.TextIOWrapper(f, encoding="utf-8")))
 
-    # Load island membership from ports.json (sits alongside the zip)
-    ports_json = path.parent / "ports.json"
+    # Load island membership from ports.json in the project root
+    ports_json = Path("ports.json")
     stop_island: dict[str, str] = {}  # stop_id -> island name (empty = mainland)
     if ports_json.exists():
         with open(ports_json, encoding="utf-8") as f:

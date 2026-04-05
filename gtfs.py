@@ -288,9 +288,9 @@ def main():
     # ------------------------------------------------------------------
     # Load ports.json (produced by Step 1 — run once, edit as needed)
     # ------------------------------------------------------------------
-    ports_path = OUTPUT_DIR / "ports.json"
+    ports_path = Path("ports.json")
     if not ports_path.exists():
-        print("gtfs/ports.json not found. Running Step 1 first...\n")
+        print("ports.json not found. Running Step 1 first...\n")
         print("=== Step 1: Discover ports ===")
         print("Authenticating...", end=" ", flush=True)
         session = get_session()
