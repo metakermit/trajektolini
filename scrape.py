@@ -35,42 +35,45 @@ def get_token(session: requests.Session) -> str:
     return r.json()["AccessToken"]
 
 
-def get_departure_points(session: requests.Session) -> list:
-    payload = {"DepartureDate": TODAY, "RelativeTo": None}
-    r = session.post(BASE_URL + "Routes/DepartureRoutePoints", json=payload)
+def get_session() -> requests.Session:
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    session.headers["Authorization"] = f"Bearer {get_token(session)}"
+    return session
+
+
+def get_departure_points(session: requests.Session, on_date: str = TODAY) -> list:
+    r = session.post(BASE_URL + "Routes/DepartureRoutePoints",
+                     json={"DepartureDate": on_date, "RelativeTo": None})
     r.raise_for_status()
     return r.json()
 
 
-def get_destination_points(session: requests.Session, departure_point: dict) -> list:
-    payload = {"DepartureDate": TODAY, "RelativeTo": departure_point}
-    r = session.post(BASE_URL + "Routes/DestinationRoutePoints", json=payload)
+def get_destination_points(session: requests.Session, departure_point: dict,
+                           on_date: str = TODAY) -> list:
+    r = session.post(BASE_URL + "Routes/DestinationRoutePoints",
+                     json={"DepartureDate": on_date, "RelativeTo": departure_point})
     r.raise_for_status()
     return r.json()
 
 
-def search_voyages(
-    session: requests.Session, departure: dict, destination: dict, max_results=5) -> list:
-    payload = {
+def search_voyages(session: requests.Session, departure: dict, destination: dict,
+                   on_date: str = TODAY, max_results: int = 5) -> list:
+    r = session.post(BASE_URL + "Routes/SearchVoyages", json={
         "DeparturePoint": departure,
         "DestinationPoint": destination,
-        "DepartureDate": TODAY,
+        "DepartureDate": on_date,
         "MaxResultCount": max_results,
-    }
-    r = session.post(BASE_URL + "Routes/SearchVoyages", json=payload)
+    })
     r.raise_for_status()
     return r.json()
 
 
 def main():
-    session = requests.Session()
-    session.headers.update(HEADERS)
-
     print(f"Jadrolinija ferry connections for {TODAY}\n")
 
     print("Authenticating...", end=" ", flush=True)
-    token = get_token(session)
-    session.headers["Authorization"] = f"Bearer {token}"
+    session = get_session()
     print("OK")
 
     print("Fetching departure ports...", end=" ", flush=True)
