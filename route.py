@@ -234,6 +234,7 @@ def find_routes(
     destination: tuple[float, float],
     gtfs: dict,
     travel_date: date,
+    depart_after: int = 0,        # earliest departure from origin, in seconds from midnight
     max_results: int = 3,
     max_drive_to_port_km: float = 500.0,
     max_drive_from_port_km: float = 100.0,
@@ -309,12 +310,9 @@ def find_routes(
                 continue
 
             # arr_drive is already computed and validated above
-            # Find the next ferry after we arrive at the departure port
-            arrive_at_port = datetime.combine(travel_date, datetime.min.time()) + \
-                             timedelta(seconds=dep_drive["duration_s"])
-            arrive_at_port_secs = int(
-                (arrive_at_port - datetime.combine(travel_date, datetime.min.time())).total_seconds()
-            )
+            # Find the next ferry after we arrive at the departure port,
+            # accounting for the earliest allowed departure time.
+            arrive_at_port_secs = int(depart_after + dep_drive["duration_s"])
 
             ferry_options = departures.get((dep_port_id, arr_port.stop_id), [])
             chosen_ferry = None
@@ -336,6 +334,7 @@ def find_routes(
             ferry_arr_secs = gtfs_time_to_seconds(chosen_ferry.arr_time)
             ferry_duration = ferry_arr_secs - ferry_dep_secs
             wait = max(0, ferry_dep_secs - arrive_at_port_secs)
+            # Total elapsed time from depart_after until arrival at destination
             total = int(dep_drive["duration_s"] + wait + ferry_duration + arr_drive["duration_s"])
 
             candidates.append(Route(
@@ -387,11 +386,19 @@ def main():
     parser.add_argument("destination", help="Destination on an island, e.g. 'Bol, Brač'")
     parser.add_argument("--date", default=date.today().isoformat(),
                         help="Travel date YYYY-MM-DD (default: today)")
+    parser.add_argument("--depart-after", default="00:00",
+                        help="Earliest departure time HH:MM (default: 00:00), e.g. 17:00")
     parser.add_argument("--results", type=int, default=3,
                         help="Max number of options to show (default: 3)")
     args = parser.parse_args()
 
     travel_date = date.fromisoformat(args.date)
+
+    try:
+        h, m = args.depart_after.split(":")
+        depart_after_secs = int(h) * 3600 + int(m) * 60
+    except ValueError:
+        raise SystemExit(f"Invalid --depart-after time '{args.depart_after}', expected HH:MM")
 
     print(f"Loading GTFS feed...", end=" ", flush=True)
     gtfs = load_gtfs(GTFS_ZIP)
@@ -405,13 +412,15 @@ def main():
     dest_lat, dest_lon, dest_name = geocode(args.destination)
     print(dest_name[:70])
 
-    print(f"\nSearching routes on {travel_date.strftime('%d %b %Y')}...\n")
+    depart_str = f", departing after {args.depart_after}" if depart_after_secs else ""
+    print(f"\nSearching routes on {travel_date.strftime('%d %b %Y')}{depart_str}...\n")
 
     routes = find_routes(
         origin=(orig_lat, orig_lon),
         destination=(dest_lat, dest_lon),
         gtfs=gtfs,
         travel_date=travel_date,
+        depart_after=depart_after_secs,
         max_results=args.results,
     )
 
