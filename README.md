@@ -45,27 +45,27 @@ python3 route.py [--date YYYY-MM-DD] [--depart-after HH:MM] [--results N] "origi
 Find routes from Rijeka to Bol on Brač, leaving today:
 
 ```bash
-python3 route.py "Rijeka" "Bol, Brač"
+python3 route.py "Rijeka" "Bol"
 ```
 ```
 ============================================================
-  Rijeka  →  Bol, Brač
+  Rijeka  →  Bol
 ============================================================
 
-Option 1  —  total ~6h 15min
+Option 1  —  total ~6h 37min
   🚗  Drive to port     4h 36min  (413 km)  →  Split
   ⛴️   Ferry            05:00 → 05:50  (50min)  [06 Apr]  SPLIT-SUPETAR
-  🚗  Drive to dest     25min  (18 km)  from Supetar
+  🚗  Drive to dest     47min  (35 km)  from Supetar
 
-Option 2  —  total ~10h 40min
+Option 2  —  total ~10h 35min
   🚗  Drive to port     5h 08min  (460 km)  →  Makarska
   ⛴️   Ferry            09:00 → 10:00  (1h 00min)  [06 Apr]  MAKARSKA-SUMARTIN
-  🚗  Drive to dest     40min  (33 km)  from Sumartin
+  🚗  Drive to dest     35min  (26 km)  from Sumartin
 
-Option 3  —  total ~18h 22min
+Option 3  —  total ~17h 41min
   🚗  Drive to port     4h 36min  (413 km)  →  Split
   ⛴️   Ferry            16:30 → 17:35  (1h 05min)  [06 Apr]  JELSA-BOL-SPLIT
-  🚗  Drive to dest     47min  (30 km)  from Bol
+  🚗  Drive to dest     6min  (2 km)  from Bol
 ```
 
 Find routes from Zagreb to Hvar, leaving on a specific date:
