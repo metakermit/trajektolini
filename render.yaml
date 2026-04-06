@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: jadrolinija
+    name: trajektolini
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
@@ -16,7 +16,7 @@ services:
         sync: false
 
   - type: cron
-    name: jadrolinija-gtfs-refresh
+    name: trajektolini-gtfs
     runtime: python
     buildCommand: pip install -r requirements.txt
     schedule: "0 3 * * *"

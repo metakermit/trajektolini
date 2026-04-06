@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape today's Jadrolinija ferry connections and print them to the console."""
+"""Scrape Jadrolinija ferry connections and print them to the console."""
 
 import uuid
 from datetime import date

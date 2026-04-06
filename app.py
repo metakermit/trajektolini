@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
         tmp_path.unlink()
 
 
-app = FastAPI(title="Jadrolinija Route Planner", lifespan=lifespan)
+app = FastAPI(title="Trajektolini", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)
