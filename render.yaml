@@ -2,6 +2,7 @@ services:
   - type: web
     name: trajektolini
     runtime: python
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     plan: starter
@@ -18,6 +19,7 @@ services:
   - type: cron
     name: trajektolini-gtfs
     runtime: python
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     schedule: "0 3 * * *"
     startCommand: python gtfs.py && python upload_gtfs.py
