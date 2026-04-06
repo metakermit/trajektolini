@@ -23,6 +23,7 @@ import requests
 
 GTFS_ZIP = Path("gtfs/jadrolinija_gtfs.zip")
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
+OVERPASS = "https://overpass-api.de/api/interpreter"
 OSRM = "https://router.project-osrm.org/route/v1/driving"
 HEADERS = {"User-Agent": "jadrolinija-route/0.1"}
 
@@ -138,6 +139,29 @@ def load_gtfs(path: Path) -> dict:
 # Geocoding
 # ---------------------------------------------------------------------------
 
+def get_island_from_osm(lat: float, lon: float) -> str | None:
+    """Return the name of the island containing (lat, lon), or None if not on an island."""
+    query = (
+        f"[out:json];"
+        f"is_in({lat},{lon})->.a;"
+        f"rel(pivot.a)[\"place\"=\"island\"];"
+        f"out tags;"
+    )
+    for attempt in range(3):
+        try:
+            r = requests.post(OVERPASS, data={"data": query}, headers=HEADERS, timeout=20)
+            if r.status_code == 429 or not r.text.strip().startswith("{"):
+                time.sleep(5 * (attempt + 1))
+                continue
+            elements = r.json().get("elements", [])
+            if elements:
+                return elements[0].get("tags", {}).get("name")
+            return None  # on mainland
+        except requests.exceptions.RequestException:
+            time.sleep(5 * (attempt + 1))
+    raise SystemExit("Overpass API unavailable after retries. Please try again shortly.")
+
+
 def geocode(query: str) -> tuple[float, float, str]:
     """Return (lat, lon, display_name) for a free-text query."""
     r = requests.get(NOMINATIM, params={"q": query, "format": "json", "limit": 1},
@@ -252,18 +276,37 @@ def find_routes(
     if not dest_ports_nearby:
         raise SystemExit("No ferry ports found near destination.")
 
-    # Determine destination island: find the nearest port that has an island name.
-    dest_island = ""
-    for _, stop in dest_ports_nearby:
-        if stop_island.get(stop.stop_id):
-            dest_island = stop_island[stop.stop_id]
-            break
+    # Determine destination island via OSM Overpass (authoritative).
+    print("  Looking up destination island via OSM...", end=" ", flush=True)
+    osm_island = get_island_from_osm(destination[0], destination[1])
+
+    if not osm_island:
+        raise SystemExit("Destination does not appear to be on an island. Try driving directly.")
+
+    # Normalize Unicode ligatures (e.g. OSM uses 'ǌ' for 'nj') before comparing.
+    def normalize(s: str) -> str:
+        return s.lower().replace("ǌ", "nj").replace("ǈ", "lj").replace("ǋ", "nj")
+
+    osm_norm = normalize(osm_island)
+    dest_island = next(
+        (isl for isl in stop_island.values() if isl and normalize(isl) == osm_norm),
+        ""
+    )
 
     if not dest_island:
+        # Check if OSRM can route there directly (bridged island like Krk)
+        direct = drive(origin, destination)
+        if direct is not None:
+            raise SystemExit(
+                f"{osm_island} island is not served by Jadrolinija ferry from this direction, "
+                f"but it appears to be reachable by road "
+                f"({direct['distance_m']/1000:.0f} km, ~{seconds_to_hhmm(direct['duration_s'])})."
+            )
         raise SystemExit(
-            "Could not determine destination island from port data. "
+            f"No Jadrolinija ferry ports found for {osm_island} island. "
             "Is the destination on an island served by Jadrolinija?"
         )
+    print(dest_island)
 
     # Island cluster: all ports on the same island as the destination.
     # These are valid arrival ports; they must NOT be used as mainland departure ports.
