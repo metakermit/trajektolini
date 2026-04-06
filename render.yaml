@@ -20,7 +20,7 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     schedule: "0 3 * * *"
-    command: python gtfs.py && python upload_gtfs.py
+    startCommand: python gtfs.py && python upload_gtfs.py
     envVars:
       - key: R2_ACCOUNT_ID
         sync: false
