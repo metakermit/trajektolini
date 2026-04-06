@@ -24,7 +24,7 @@ import requests
 
 GTFS_ZIP = Path(os.environ.get("GTFS_ZIP_PATH", "gtfs/jadrolinija_gtfs.zip"))
 PORTS_JSON = Path(os.environ.get("PORTS_JSON_PATH", "ports.json"))
-NOMINATIM = "https://nominatim.openstreetmap.org/search"
+PHOTON = "https://photon.komoot.io/api/"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 OSRM = "https://router.project-osrm.org/route/v1/driving"
 HEADERS = {"User-Agent": "jadrolinija-route/0.1"}
@@ -172,23 +172,25 @@ def geocode(query: str) -> tuple[float, float, str]:
     """Return (lat, lon, display_name) for a free-text query."""
     for attempt in range(3):
         try:
-            r = requests.get(NOMINATIM, params={"q": query, "format": "json", "limit": 1},
-                             headers=HEADERS)
+            r = requests.get(PHOTON, params={"q": query, "limit": 1},
+                             headers=HEADERS, timeout=10)
             if r.status_code == 429:
                 time.sleep(5 * (attempt + 1))
                 continue
             r.raise_for_status()
-            results = r.json()
-            time.sleep(1.1)
-            if not results:
+            features = r.json().get("features", [])
+            if not features:
                 raise RouteError(f"Could not geocode: '{query}'")
-            res = results[0]
-            return float(res["lat"]), float(res["lon"]), res["display_name"]
+            feat = features[0]
+            lon, lat = feat["geometry"]["coordinates"]
+            props = feat["properties"]
+            name = ", ".join(filter(None, [props.get("name"), props.get("city"), props.get("country")]))
+            return float(lat), float(lon), name
         except RouteError:
             raise
         except requests.exceptions.RequestException:
             time.sleep(5 * (attempt + 1))
-    raise RouteError("Geocoding service is rate-limited. Please try again in a moment.")
+    raise RouteError("Geocoding service unavailable. Please try again in a moment.")
 
 
 # ---------------------------------------------------------------------------
