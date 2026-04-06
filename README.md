@@ -2,7 +2,7 @@
 
 # Trajektolini
 
-Organises all ferry connections advertised by [Jadrolinija](https://www.jadrolinija.hr/) into a GTFS format that can be used more easily for planning trips. The generated GTFS feed is used together with Open Street Maps for combining road and ferry connections in this [demo trip planner](https://trajektolini.metakermit.com/). _Note: just for demonstration purposes, the routing logic is experimental._
+Organises all ferry connections advertised by [Jadrolinija](https://www.jadrolinija.hr/) into a [GTFS format](https://gtfs.org/) that can be used more easily for planning trips. The generated GTFS feed is used together with Open Street Maps for combining road and ferry connections in this [demo trip planner](https://trajektolini.metakermit.com/). _Note: just for demonstration purposes, the routing logic is experimental._
 
 ## Setup
 

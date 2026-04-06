@@ -280,138 +280,183 @@ def find_routes(
     max_results: int = 3,
     max_drive_to_port_km: float = 500.0,
     max_drive_from_port_km: float = 100.0,
-    osm_island: str | None = None,  # pre-computed from get_island_from_osm(); skips Overpass call if given
+    osm_island: str | None = None,        # destination island (pre-computed); skips Overpass call
+    origin_island: str | None = None,     # origin island (pre-computed); skips Overpass call
 ) -> list[Route]:
 
     stops = gtfs["stops"]
     departures = gtfs["departures"]
     date_str = travel_date.strftime("%Y%m%d")
-
-    # Ports near destination (island side)
     stop_island = gtfs.get("stop_island", {})
-
-    dest_ports_nearby = nearest_stops(destination[0], destination[1], stops,
-                                      max_km=max_drive_from_port_km)
-    if not dest_ports_nearby:
-        raise RouteError("No ferry ports found near destination.")
-
-    # Determine destination island via OSM Overpass (authoritative).
-    # Caller may pass osm_island directly to skip the Overpass call (e.g. web app streaming progress).
-    if osm_island is None:
-        print("  Looking up destination island via OSM...", end=" ", flush=True)
-        osm_island = get_island_from_osm(destination[0], destination[1])
-
-    if not osm_island:
-        raise RouteError("Destination does not appear to be on an island. Try driving directly.")
 
     # Normalize Unicode ligatures (e.g. OSM uses 'ǌ' for 'nj') before comparing.
     def normalize(s: str) -> str:
         return s.lower().replace("ǌ", "nj").replace("ǈ", "lj").replace("ǋ", "nj")
 
-    osm_norm = normalize(osm_island)
-    dest_island = next(
-        (isl for isl in stop_island.values() if isl and normalize(isl) == osm_norm),
-        ""
-    )
-
-    if not dest_island:
-        # Check if OSRM can route there directly (bridged island like Krk)
-        direct = drive(origin, destination)
-        if direct is not None:
-            raise RouteError(
-                f"{osm_island} island is not served by Jadrolinija ferry from this direction, "
-                f"but it appears to be reachable by road "
-                f"({direct['distance_m']/1000:.0f} km, ~{seconds_to_hhmm(direct['duration_s'])})."
-            )
-        raise RouteError(
-            f"No Jadrolinija ferry ports found for {osm_island} island. "
-            "Is the destination on an island served by Jadrolinija?"
+    def resolve_island(osm_name: str) -> str:
+        """Map an OSM island name to the canonical name used in ports.json."""
+        osm_norm = normalize(osm_name)
+        return next(
+            (isl for isl in stop_island.values() if isl and normalize(isl) == osm_norm),
+            ""
         )
-    print(dest_island)
 
-    # Island cluster: all ports on the same island as the destination.
-    # These are valid arrival ports; they must NOT be used as mainland departure ports.
-    island_cluster = {
-        sid for sid, isl in stop_island.items() if isl == dest_island
-    }
-    arr_port_ids = island_cluster & {s.stop_id for _, s in dest_ports_nearby}
-    print(f"  Destination island: {dest_island}")
-    print(f"  Island ports (valid arrival): {sorted(arr_port_ids)}")
-
-    # Drive from each island port to destination (cached, reused below)
-    arr_drives: dict[str, dict] = {}
-    for stop_id in arr_port_ids:
-        stop = stops[stop_id]
-        result = drive((stop.lat, stop.lon), destination)
-        if result is not None:
-            arr_drives[stop_id] = result
-
-    if not arr_drives:
-        raise RouteError("No island arrival ports reachable by road from destination.")
-
-    candidates: list[Route] = []
-
-    for stop_id, arr_drive in arr_drives.items():
-        arr_port = stops[stop_id]
-
-        # Find all ports that have ferries to this arrival port
-        mainland_ports = {
-            dep_stop_id: stops[dep_stop_id]
-            for (dep_stop_id, arr_stop_id) in departures
-            if arr_stop_id == arr_port.stop_id and dep_stop_id in stops
-        }
-
-        for dep_port_id, dep_port in mainland_ports.items():
-            # Skip ports on the destination island
-            if dep_port_id in island_cluster:
+    def pick_ferry(dep_port_id: str, arr_port_id: str, arrive_at_port_secs: int) -> FerryTrip | None:
+        """Return the first viable ferry from dep_port to arr_port given arrival time."""
+        for ferry in departures.get((dep_port_id, arr_port_id), []):
+            if ferry.dep_date < date_str:
                 continue
-            # Skip ports on any island — they can't be driven to from the mainland
-            if stop_island.get(dep_port_id):
-                continue
-
-            # Drive origin -> departure port
-            dep_drive = drive(origin, (dep_port.lat, dep_port.lon))
-            if dep_drive is None:
-                continue
-            if dep_drive["distance_m"] > max_drive_to_port_km * 1000:
-                continue
-
-            # arr_drive is already computed and validated above
-            # Find the next ferry after we arrive at the departure port,
-            # accounting for the earliest allowed departure time.
-            arrive_at_port_secs = int(depart_after + dep_drive["duration_s"])
-
-            ferry_options = departures.get((dep_port_id, arr_port.stop_id), [])
-            chosen_ferry = None
-            for ferry in ferry_options:
-                if ferry.dep_date < date_str:
+            if ferry.dep_date == date_str:
+                if gtfs_time_to_seconds(ferry.dep_time) < arrive_at_port_secs + 900:
                     continue
-                if ferry.dep_date == date_str:
-                    # Must depart at least 15 min after we arrive
-                    if gtfs_time_to_seconds(ferry.dep_time) < arrive_at_port_secs + 900:
+            return ferry
+        return None
+
+    def build_candidates(island_port_ids: set, island_coords: tuple,
+                         mainland_coords: tuple, island_is_origin: bool) -> list[Route]:
+        """
+        Build route candidates for one ferry direction.
+        island_coords / mainland_coords are the actual origin/destination coords.
+        """
+        # Drive from island location to each island port
+        island_drives: dict[str, dict] = {}
+        for stop_id in island_port_ids:
+            result = drive(island_coords, (stops[stop_id].lat, stops[stop_id].lon))
+            if result is not None:
+                island_drives[stop_id] = result
+
+        candidates: list[Route] = []
+
+        for island_port_id, island_drive in island_drives.items():
+            island_port = stops[island_port_id]
+
+            # Find mainland ports connected to this island port by ferry
+            if island_is_origin:
+                # island port departs, mainland port arrives
+                connected_mainland = {
+                    arr_id: stops[arr_id]
+                    for (dep_id, arr_id) in departures
+                    if dep_id == island_port_id and arr_id in stops
+                }
+            else:
+                # mainland port departs, island port arrives
+                connected_mainland = {
+                    dep_id: stops[dep_id]
+                    for (dep_id, arr_id) in departures
+                    if arr_id == island_port_id and dep_id in stops
+                }
+
+            for mainland_port_id, mainland_port in connected_mainland.items():
+                # Mainland ports must actually be on the mainland
+                if stop_island.get(mainland_port_id):
+                    continue
+
+                if island_is_origin:
+                    dep_port, arr_port = island_port, mainland_port
+                    dep_drive = island_drive
+                    arr_drive = drive((mainland_port.lat, mainland_port.lon), mainland_coords)
+                    # island leg is short; mainland→destination leg may be long
+                    if arr_drive is None or arr_drive["distance_m"] > max_drive_to_port_km * 1000:
                         continue
-                chosen_ferry = ferry
-                break
+                    arrive_at_dep_port = int(depart_after + dep_drive["duration_s"])
+                    chosen_ferry = pick_ferry(dep_port.stop_id, arr_port.stop_id, arrive_at_dep_port)
+                else:
+                    dep_port, arr_port = mainland_port, island_port
+                    dep_drive = drive(mainland_coords, (mainland_port.lat, mainland_port.lon))
+                    if dep_drive is None or dep_drive["distance_m"] > max_drive_to_port_km * 1000:
+                        continue
+                    arr_drive = island_drive
+                    arrive_at_dep_port = int(depart_after + dep_drive["duration_s"])
+                    chosen_ferry = pick_ferry(dep_port.stop_id, arr_port.stop_id, arrive_at_dep_port)
 
-            if chosen_ferry is None:
-                continue
+                if chosen_ferry is None:
+                    continue
 
-            # Total time: drive to port + wait + ferry + drive from port
-            ferry_dep_secs = gtfs_time_to_seconds(chosen_ferry.dep_time)
-            ferry_arr_secs = gtfs_time_to_seconds(chosen_ferry.arr_time)
-            ferry_duration = ferry_arr_secs - ferry_dep_secs
-            wait = max(0, ferry_dep_secs - arrive_at_port_secs)
-            # Total elapsed time from depart_after until arrival at destination
-            total = int(dep_drive["duration_s"] + wait + ferry_duration + arr_drive["duration_s"])
+                ferry_dep_secs = gtfs_time_to_seconds(chosen_ferry.dep_time)
+                ferry_arr_secs = gtfs_time_to_seconds(chosen_ferry.arr_time)
+                ferry_duration = ferry_arr_secs - ferry_dep_secs
+                wait = max(0, ferry_dep_secs - arrive_at_dep_port)
+                total = int(dep_drive["duration_s"] + wait + ferry_duration + arr_drive["duration_s"])
 
-            candidates.append(Route(
-                drive_to_port=dep_drive,
-                ferry=chosen_ferry,
-                drive_from_port=arr_drive,
-                dep_port=dep_port,
-                arr_port=arr_port,
-                total_seconds=total,
-            ))
+                candidates.append(Route(
+                    drive_to_port=dep_drive,
+                    ferry=chosen_ferry,
+                    drive_from_port=arr_drive,
+                    dep_port=dep_port,
+                    arr_port=arr_port,
+                    total_seconds=total,
+                ))
+
+        return candidates
+
+    # ------------------------------------------------------------------
+    # Determine which end is on an island and route accordingly.
+    # ------------------------------------------------------------------
+
+    # Try destination island first (mainland → island, the common case).
+    # Skip if origin_island is already provided — caller knows direction is island → mainland.
+    if osm_island is None and origin_island is None:
+        print("  Looking up destination island via OSM...", end=" ", flush=True)
+        osm_island = get_island_from_osm(destination[0], destination[1])
+
+    if osm_island:
+        dest_island = resolve_island(osm_island)
+        if not dest_island:
+            direct = drive(origin, destination)
+            if direct is not None:
+                raise RouteError(
+                    f"{osm_island} island is not served by Jadrolinija ferry from this direction, "
+                    f"but it appears to be reachable by road "
+                    f"({direct['distance_m']/1000:.0f} km, ~{seconds_to_hhmm(direct['duration_s'])})."
+                )
+            raise RouteError(
+                f"No Jadrolinija ferry ports found for {osm_island} island. "
+                "Is the destination on an island served by Jadrolinija?"
+            )
+        print(dest_island)
+        island_cluster = {sid for sid, isl in stop_island.items() if isl == dest_island}
+        dest_ports_nearby = nearest_stops(destination[0], destination[1], stops,
+                                          max_km=max_drive_from_port_km)
+        arr_port_ids = island_cluster & {s.stop_id for _, s in dest_ports_nearby}
+        print(f"  Destination island: {dest_island}")
+        print(f"  Island ports (valid arrival): {sorted(arr_port_ids)}")
+        if not arr_port_ids:
+            raise RouteError("No island arrival ports found near destination.")
+        candidates = build_candidates(arr_port_ids, destination, origin,
+                                      island_is_origin=False)
+        if not candidates:
+            raise RouteError("No island arrival ports reachable by road from destination.")
+
+    else:
+        # Destination is not on an island — try origin instead (island → mainland).
+        if origin_island is None:
+            print("  Looking up origin island via OSM...", end=" ", flush=True)
+            origin_island = get_island_from_osm(origin[0], origin[1])
+
+        if not origin_island:
+            raise RouteError(
+                "Neither origin nor destination appears to be on an island. Try driving directly."
+            )
+
+        orig_island = resolve_island(origin_island)
+        if not orig_island:
+            raise RouteError(
+                f"No Jadrolinija ferry ports found for {origin_island} island. "
+                "Is the origin on an island served by Jadrolinija?"
+            )
+        print(orig_island)
+        island_cluster = {sid for sid, isl in stop_island.items() if isl == orig_island}
+        orig_ports_nearby = nearest_stops(origin[0], origin[1], stops,
+                                          max_km=max_drive_to_port_km)
+        dep_port_ids = island_cluster & {s.stop_id for _, s in orig_ports_nearby}
+        print(f"  Origin island: {orig_island}")
+        print(f"  Island ports (valid departure): {sorted(dep_port_ids)}")
+        if not dep_port_ids:
+            raise RouteError("No island departure ports found near origin.")
+        candidates = build_candidates(dep_port_ids, origin, destination,
+                                      island_is_origin=True)
+        if not candidates:
+            raise RouteError("No routes found from origin island to destination.")
 
     candidates.sort(key=lambda r: r.total_seconds)
     return candidates[:max_results]

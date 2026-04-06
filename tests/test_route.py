@@ -134,6 +134,39 @@ class TestRouteSplitVis:
             )
 
 
+class TestRouteMartinscicaZagreb:
+    """Martinšćica (Cres island) → Zagreb (mainland) — tests island-origin routing."""
+
+    MARTINSCICA = (44.966, 14.371)
+    ZAGREB = (45.815, 15.982)
+
+    def test_finds_routes(self, gtfs):
+        with patch("route.drive", side_effect=haversine_drive):
+            routes = find_routes(self.MARTINSCICA, self.ZAGREB, gtfs, TEST_DATE,
+                                 origin_island="Cres")
+        assert len(routes) >= 1
+
+    def test_all_routes_depart_from_cres(self, gtfs):
+        with patch("route.drive", side_effect=haversine_drive):
+            routes = find_routes(self.MARTINSCICA, self.ZAGREB, gtfs, TEST_DATE,
+                                 origin_island="Cres")
+        cres_ports = {"CRE", "MAR", "MER", "POR"}
+        for r in routes:
+            assert r.dep_port.stop_id in cres_ports, (
+                f"Expected departure from a Cres port, got {r.dep_port.stop_id}"
+            )
+
+    def test_arrival_port_is_on_mainland(self, gtfs):
+        with patch("route.drive", side_effect=haversine_drive):
+            routes = find_routes(self.MARTINSCICA, self.ZAGREB, gtfs, TEST_DATE,
+                                 origin_island="Cres")
+        stop_island = gtfs["stop_island"]
+        for r in routes:
+            assert not stop_island.get(r.arr_port.stop_id), (
+                f"Arrival port {r.arr_port.stop_id} should be on mainland"
+            )
+
+
 class TestRouteRijekaCres:
     """Rijeka → Cres (island) — tests northern Adriatic routing."""
 

@@ -110,6 +110,11 @@ async def search(
             yield event({"type": "progress", "message": "Identifying destination island…"})
             osm_island = await asyncio.to_thread(get_island_from_osm, dest_lat, dest_lon)
 
+            origin_island = None
+            if not osm_island:
+                yield event({"type": "progress", "message": "Identifying origin island…"})
+                origin_island = await asyncio.to_thread(get_island_from_osm, orig_lat, orig_lon)
+
             yield event({"type": "progress", "message": "Calculating routes…"})
             routes = await asyncio.to_thread(
                 find_routes,
@@ -122,6 +127,7 @@ async def search(
                 500.0,
                 100.0,
                 osm_island,
+                origin_island,
             )
 
             yield event({
