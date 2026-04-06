@@ -24,6 +24,18 @@ To verify the generated feed:
 python3 verify_gtfs.py
 ```
 
+## Web app
+
+`app.py` is a FastAPI web interface for the route planner.
+
+### Running locally
+
+```bash
+uvicorn app:app --reload
+```
+
+Then open [http://localhost:8000](http://localhost:8000). The app loads the GTFS feed from `gtfs/jadrolinija_gtfs.zip` on startup — generate it first if you haven't already (see above).
+
 ## Route planner
 
 `route.py` finds the best driving + ferry combinations to reach an island destination, combining road routing (OSRM) with the generated GTFS feed.
