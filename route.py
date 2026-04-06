@@ -12,6 +12,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import sys
 import time
 import zipfile
@@ -21,11 +22,16 @@ from pathlib import Path
 
 import requests
 
-GTFS_ZIP = Path("gtfs/jadrolinija_gtfs.zip")
+GTFS_ZIP = Path(os.environ.get("GTFS_ZIP_PATH", "gtfs/jadrolinija_gtfs.zip"))
+PORTS_JSON = Path(os.environ.get("PORTS_JSON_PATH", "ports.json"))
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
 OVERPASS = "https://overpass-api.de/api/interpreter"
 OSRM = "https://router.project-osrm.org/route/v1/driving"
 HEADERS = {"User-Agent": "jadrolinija-route/0.1"}
+
+
+class RouteError(Exception):
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +79,8 @@ def load_gtfs(path: Path) -> dict:
             with zf.open(name) as f:
                 data[name] = list(csv.DictReader(io.TextIOWrapper(f, encoding="utf-8")))
 
-    # Load island membership from ports.json in the project root
-    ports_json = Path("ports.json")
+    # Load island membership from ports.json
+    ports_json = PORTS_JSON
     stop_island: dict[str, str] = {}  # stop_id -> island name (empty = mainland)
     if ports_json.exists():
         with open(ports_json, encoding="utf-8") as f:
@@ -159,7 +165,7 @@ def get_island_from_osm(lat: float, lon: float) -> str | None:
             return None  # on mainland
         except requests.exceptions.RequestException:
             time.sleep(5 * (attempt + 1))
-    raise SystemExit("Overpass API unavailable after retries. Please try again shortly.")
+    raise RouteError("Overpass API unavailable after retries. Please try again shortly.")
 
 
 def geocode(query: str) -> tuple[float, float, str]:
@@ -170,7 +176,7 @@ def geocode(query: str) -> tuple[float, float, str]:
     results = r.json()
     time.sleep(1.1)
     if not results:
-        raise SystemExit(f"Could not geocode: '{query}'")
+        raise RouteError(f"Could not geocode: '{query}'")
     res = results[0]
     return float(res["lat"]), float(res["lon"]), res["display_name"]
 
@@ -262,6 +268,7 @@ def find_routes(
     max_results: int = 3,
     max_drive_to_port_km: float = 500.0,
     max_drive_from_port_km: float = 100.0,
+    osm_island: str | None = None,  # pre-computed from get_island_from_osm(); skips Overpass call if given
 ) -> list[Route]:
 
     stops = gtfs["stops"]
@@ -274,14 +281,16 @@ def find_routes(
     dest_ports_nearby = nearest_stops(destination[0], destination[1], stops,
                                       max_km=max_drive_from_port_km)
     if not dest_ports_nearby:
-        raise SystemExit("No ferry ports found near destination.")
+        raise RouteError("No ferry ports found near destination.")
 
     # Determine destination island via OSM Overpass (authoritative).
-    print("  Looking up destination island via OSM...", end=" ", flush=True)
-    osm_island = get_island_from_osm(destination[0], destination[1])
+    # Caller may pass osm_island directly to skip the Overpass call (e.g. web app streaming progress).
+    if osm_island is None:
+        print("  Looking up destination island via OSM...", end=" ", flush=True)
+        osm_island = get_island_from_osm(destination[0], destination[1])
 
     if not osm_island:
-        raise SystemExit("Destination does not appear to be on an island. Try driving directly.")
+        raise RouteError("Destination does not appear to be on an island. Try driving directly.")
 
     # Normalize Unicode ligatures (e.g. OSM uses 'ǌ' for 'nj') before comparing.
     def normalize(s: str) -> str:
@@ -297,12 +306,12 @@ def find_routes(
         # Check if OSRM can route there directly (bridged island like Krk)
         direct = drive(origin, destination)
         if direct is not None:
-            raise SystemExit(
+            raise RouteError(
                 f"{osm_island} island is not served by Jadrolinija ferry from this direction, "
                 f"but it appears to be reachable by road "
                 f"({direct['distance_m']/1000:.0f} km, ~{seconds_to_hhmm(direct['duration_s'])})."
             )
-        raise SystemExit(
+        raise RouteError(
             f"No Jadrolinija ferry ports found for {osm_island} island. "
             "Is the destination on an island served by Jadrolinija?"
         )
@@ -326,7 +335,7 @@ def find_routes(
             arr_drives[stop_id] = result
 
     if not arr_drives:
-        raise SystemExit("No island arrival ports reachable by road from destination.")
+        raise RouteError("No island arrival ports reachable by road from destination.")
 
     candidates: list[Route] = []
 
@@ -397,6 +406,41 @@ def find_routes(
 
 
 # ---------------------------------------------------------------------------
+# Serialisation (for web API)
+# ---------------------------------------------------------------------------
+
+def route_to_dict(route: Route) -> dict:
+    ferry = route.ferry
+    ferry_dur = gtfs_time_to_seconds(ferry.arr_time) - gtfs_time_to_seconds(ferry.dep_time)
+    ferry_date_display = datetime.strptime(ferry.dep_date, "%Y%m%d").strftime("%d %b")
+    return {
+        "total_seconds": route.total_seconds,
+        "total_display": seconds_to_hhmm(route.total_seconds),
+        "drive_to_port": {
+            "duration_s": route.drive_to_port["duration_s"],
+            "distance_m": route.drive_to_port["distance_m"],
+            "duration_display": seconds_to_hhmm(route.drive_to_port["duration_s"]),
+            "distance_km": round(route.drive_to_port["distance_m"] / 1000),
+            "port_name": route.dep_port.name,
+        },
+        "ferry": {
+            "dep_time": gtfs_display_time(ferry.dep_time),
+            "arr_time": gtfs_display_time(ferry.arr_time),
+            "duration_display": seconds_to_hhmm(ferry_dur),
+            "date_display": ferry_date_display,
+            "route_name": ferry.route_name,
+        },
+        "drive_from_port": {
+            "duration_s": route.drive_from_port["duration_s"],
+            "distance_m": route.drive_from_port["distance_m"],
+            "duration_display": seconds_to_hhmm(route.drive_from_port["duration_s"]),
+            "distance_km": round(route.drive_from_port["distance_m"] / 1000),
+            "port_name": route.arr_port.name,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
 
@@ -450,25 +494,31 @@ def main():
     gtfs = load_gtfs(GTFS_ZIP)
     print(f"OK ({len(gtfs['stops'])} stops, {len(gtfs['departures'])} route pairs)")
 
-    print(f"Geocoding '{args.origin}'...", end=" ", flush=True)
-    orig_lat, orig_lon, orig_name = geocode(args.origin)
-    print(orig_name[:70])
+    try:
+        print(f"Geocoding '{args.origin}'...", end=" ", flush=True)
+        orig_lat, orig_lon, orig_name = geocode(args.origin)
+        print(orig_name[:70])
 
-    print(f"Geocoding '{args.destination}'...", end=" ", flush=True)
-    dest_lat, dest_lon, dest_name = geocode(args.destination)
-    print(dest_name[:70])
+        print(f"Geocoding '{args.destination}'...", end=" ", flush=True)
+        dest_lat, dest_lon, dest_name = geocode(args.destination)
+        print(dest_name[:70])
+    except RouteError as e:
+        sys.exit(str(e))
 
     depart_str = f", departing after {args.depart_after}" if depart_after_secs else ""
     print(f"\nSearching routes on {travel_date.strftime('%d %b %Y')}{depart_str}...\n")
 
-    routes = find_routes(
-        origin=(orig_lat, orig_lon),
-        destination=(dest_lat, dest_lon),
-        gtfs=gtfs,
-        travel_date=travel_date,
-        depart_after=depart_after_secs,
-        max_results=args.results,
-    )
+    try:
+        routes = find_routes(
+            origin=(orig_lat, orig_lon),
+            destination=(dest_lat, dest_lon),
+            gtfs=gtfs,
+            travel_date=travel_date,
+            depart_after=depart_after_secs,
+            max_results=args.results,
+        )
+    except RouteError as e:
+        sys.exit(str(e))
 
     print("=" * 60)
     print(f"  {args.origin}  →  {args.destination}")

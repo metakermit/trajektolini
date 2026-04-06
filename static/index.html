@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadrolinija Route Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 0.25rem;
+    }
+    .subtitle {
+      color: #666;
+      margin: 0 0 2rem;
+      font-size: 0.9rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1.5px solid #dde1e7;
+      border-radius: 8px;
+      font-size: 1rem;
+      background: #fff;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    input:focus { border-color: #3b82f6; }
+
+    button {
+      width: 100%;
+      padding: 0.7rem;
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #1e40af; }
+    button:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    #status {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: #555;
+      min-height: 1.2em;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 0.9em;
+      height: 0.9em;
+      border: 2px solid #93c5fd;
+      border-top-color: #1d4ed8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #results { margin-top: 1.5rem; }
+
+    .header-bar {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0.7rem 1rem;
+      border-radius: 8px 8px 0 0;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .route-card {
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
+      border-top: none;
+      padding: 1rem;
+    }
+    .route-card:last-child { border-radius: 0 0 8px 8px; }
+
+    .route-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 0.6rem;
+      color: #1a1a2e;
+    }
+
+    .leg {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+    .leg-icon { font-size: 1rem; flex-shrink: 0; width: 1.5rem; text-align: center; }
+    .leg-label { color: #6b7280; font-size: 0.8rem; min-width: 7rem; }
+    .leg-detail { flex: 1; }
+    .leg-meta { color: #9ca3af; font-size: 0.8rem; white-space: nowrap; }
+
+    .error-box {
+      background: #fef2f2;
+      border: 1.5px solid #fca5a5;
+      color: #b91c1c;
+      padding: 0.8rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .no-results {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>&#9961; Jadrolinija Route Planner</h1>
+  <p class="subtitle">Find the best driving + ferry combinations to Adriatic islands.</p>
+
+  <form id="searchForm">
+    <div class="form-grid">
+      <div class="full">
+        <label for="origin">From</label>
+        <input id="origin" name="origin" type="text" placeholder="e.g. Zagreb, Rijeka" required>
+      </div>
+      <div class="full">
+        <label for="destination">To</label>
+        <input id="destination" name="destination" type="text" placeholder="e.g. Hvar, Bol, Vis" required>
+      </div>
+      <div>
+        <label for="date">Date</label>
+        <input id="date" name="date" type="date">
+      </div>
+      <div>
+        <label for="depart_after">Depart after</label>
+        <input id="depart_after" name="depart_after" type="time" value="00:00">
+      </div>
+    </div>
+    <button type="submit" id="searchBtn">Search</button>
+  </form>
+
+  <div id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+  // Default date to today
+  document.getElementById('date').valueAsDate = new Date();
+
+  const form = document.getElementById('searchForm');
+  const btn = document.getElementById('searchBtn');
+  const statusEl = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+
+  let es = null;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (es) es.close();
+
+    resultsEl.innerHTML = '';
+    btn.disabled = true;
+
+    const origin = document.getElementById('origin').value.trim();
+    const destination = document.getElementById('destination').value.trim();
+    const date = document.getElementById('date').value;
+    const departAfter = document.getElementById('depart_after').value;
+
+    const params = new URLSearchParams({ origin, destination, depart_after: departAfter });
+    if (date) params.set('date', date);
+
+    es = new EventSource(`/search?${params}`);
+
+    es.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+
+      if (msg.type === 'progress') {
+        statusEl.innerHTML = `<span class="spinner"></span>${msg.message}`;
+      }
+
+      if (msg.type === 'error') {
+        statusEl.innerHTML = '';
+        resultsEl.innerHTML = `<div class="error-box">${escHtml(msg.message)}</div>`;
+        es.close();
+        btn.disabled = false;
+      }
+
+      if (msg.type === 'result') {
+        statusEl.innerHTML = '';
+        renderResults(msg);
+        es.close();
+        btn.disabled = false;
+      }
+
+      if (msg.type === 'done') {
+        statusEl.innerHTML = '';
+        es.close();
+        btn.disabled = false;
+      }
+    };
+
+    es.onerror = () => {
+      statusEl.innerHTML = '';
+      if (resultsEl.innerHTML === '') {
+        resultsEl.innerHTML = `<div class="error-box">Connection error. Please try again.</div>`;
+      }
+      es.close();
+      btn.disabled = false;
+    };
+  });
+
+  function renderResults(msg) {
+    if (!msg.routes || msg.routes.length === 0) {
+      resultsEl.innerHTML = `<p class="no-results">No routes found. Try a different date or destination.</p>`;
+      return;
+    }
+
+    let html = `<div class="header-bar">${escHtml(msg.origin)} &rarr; ${escHtml(msg.destination)}</div>`;
+
+    msg.routes.forEach((r, i) => {
+      html += `<div class="route-card">`;
+      html += `<div class="route-title">Option ${i + 1} &mdash; total ~${escHtml(r.total_display)}</div>`;
+
+      const d2p = r.drive_to_port;
+      html += leg('&#x1F697;', 'Drive to port',
+        `${escHtml(d2p.duration_display)} &rarr; ${escHtml(d2p.port_name)}`,
+        `${d2p.distance_km}&thinsp;km`);
+
+      const f = r.ferry;
+      html += leg('&#x26F4;&#xFE0F;', 'Ferry',
+        `${escHtml(f.dep_time)} &rarr; ${escHtml(f.arr_time)} (${escHtml(f.duration_display)})`,
+        `${escHtml(f.date_display)} &bull; ${escHtml(f.route_name)}`);
+
+      const dfp = r.drive_from_port;
+      html += leg('&#x1F697;', 'Drive to dest',
+        `${escHtml(dfp.duration_display)} from ${escHtml(dfp.port_name)}`,
+        `${dfp.distance_km}&thinsp;km`);
+
+      html += `</div>`;
+    });
+
+    resultsEl.innerHTML = html;
+  }
+
+  function leg(icon, label, detail, meta) {
+    return `<div class="leg">
+      <span class="leg-icon">${icon}</span>
+      <span class="leg-label">${label}</span>
+      <span class="leg-detail">${detail}</span>
+      <span class="leg-meta">${meta}</span>
+    </div>`;
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
