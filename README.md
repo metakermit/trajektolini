@@ -26,6 +26,14 @@ To verify the generated feed:
 python3 verify_gtfs.py
 ```
 
+## Tests
+
+```bash
+pytest
+```
+
+The test suite covers the time helpers and route-finding logic for key city pairs (Zagreb → Hvar, Split → Vis, Rijeka → Cres). A versioned GTFS fixture is checked in under `tests/fixtures/` so the tests can run in CI without generating the feed first.
+
 ## Web app
 
 `app.py` is a FastAPI web interface for the route planner.
