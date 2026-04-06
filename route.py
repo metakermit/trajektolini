@@ -170,15 +170,25 @@ def get_island_from_osm(lat: float, lon: float) -> str | None:
 
 def geocode(query: str) -> tuple[float, float, str]:
     """Return (lat, lon, display_name) for a free-text query."""
-    r = requests.get(NOMINATIM, params={"q": query, "format": "json", "limit": 1},
-                     headers=HEADERS)
-    r.raise_for_status()
-    results = r.json()
-    time.sleep(1.1)
-    if not results:
-        raise RouteError(f"Could not geocode: '{query}'")
-    res = results[0]
-    return float(res["lat"]), float(res["lon"]), res["display_name"]
+    for attempt in range(3):
+        try:
+            r = requests.get(NOMINATIM, params={"q": query, "format": "json", "limit": 1},
+                             headers=HEADERS)
+            if r.status_code == 429:
+                time.sleep(5 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            results = r.json()
+            time.sleep(1.1)
+            if not results:
+                raise RouteError(f"Could not geocode: '{query}'")
+            res = results[0]
+            return float(res["lat"]), float(res["lon"]), res["display_name"]
+        except RouteError:
+            raise
+        except requests.exceptions.RequestException:
+            time.sleep(5 * (attempt + 1))
+    raise RouteError("Geocoding service is rate-limited. Please try again in a moment.")
 
 
 # ---------------------------------------------------------------------------
