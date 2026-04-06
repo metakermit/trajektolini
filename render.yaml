@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: jadrolinija
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    envVars:
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+
+  - type: cron
+    name: jadrolinija-gtfs-refresh
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 3 * * *"
+    command: python gtfs.py && python upload_gtfs.py
+    envVars:
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false

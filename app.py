@@ -4,10 +4,13 @@
 import asyncio
 import json
 import os
+import tempfile
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
@@ -18,14 +21,46 @@ from route import (
 
 _gtfs: dict | None = None
 
+R2_KEY = "jadrolinija_gtfs.zip"
+
+
+def _download_from_r2() -> Path:
+    account_id = os.environ["R2_ACCOUNT_ID"]
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+        region_name="auto",
+    )
+    bucket = os.environ["R2_BUCKET"]
+    tmp = Path(tempfile.mktemp(suffix=".zip"))
+    s3.download_file(bucket, R2_KEY, str(tmp))
+    return tmp
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _gtfs
-    print(f"Loading GTFS feed from {GTFS_ZIP}...", flush=True)
-    _gtfs = await asyncio.to_thread(load_gtfs, GTFS_ZIP)
+    tmp_path = None
+    if os.environ.get("R2_ACCOUNT_ID"):
+        print("Downloading GTFS feed from R2...", flush=True)
+        try:
+            tmp_path = await asyncio.to_thread(_download_from_r2)
+            zip_path = tmp_path
+        except (BotoCoreError, ClientError) as e:
+            raise RuntimeError(f"Failed to download GTFS from R2: {e}") from e
+    else:
+        zip_path = GTFS_ZIP
+
+    print(f"Loading GTFS feed from {zip_path}...", flush=True)
+    _gtfs = await asyncio.to_thread(load_gtfs, zip_path)
     print(f"GTFS loaded: {len(_gtfs['stops'])} stops, {len(_gtfs['departures'])} route pairs")
+
     yield
+
+    if tmp_path and tmp_path.exists():
+        tmp_path.unlink()
 
 
 app = FastAPI(title="Jadrolinija Route Planner", lifespan=lifespan)
