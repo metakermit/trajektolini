@@ -159,6 +159,31 @@
       font-size: 0.9rem;
       margin-top: 1rem;
     }
+
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-drop {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1.5px solid #dde1e7;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      z-index: 200;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .ac-item {
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+      border-bottom: 1px solid #f0f4f8;
+      line-height: 1.3;
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:hover, .ac-item.ac-active { background: #eff6ff; }
   </style>
 </head>
 <body>
@@ -171,11 +196,21 @@
     <div class="form-grid">
       <div class="full">
         <label for="origin">From</label>
-        <input id="origin" name="origin" type="text" placeholder="e.g. Zagreb, Rijeka" required>
+        <div class="autocomplete-wrap">
+          <input id="origin" name="origin" type="text" placeholder="e.g. Zagreb, Rijeka" required autocomplete="off">
+          <div class="autocomplete-drop" id="origin-drop" hidden></div>
+        </div>
+        <input type="hidden" id="origin_lat" name="origin_lat">
+        <input type="hidden" id="origin_lon" name="origin_lon">
       </div>
       <div class="full">
         <label for="destination">To</label>
-        <input id="destination" name="destination" type="text" placeholder="e.g. Hvar, Bol, Vis" required>
+        <div class="autocomplete-wrap">
+          <input id="destination" name="destination" type="text" placeholder="e.g. Hvar, Bol, Vis" required autocomplete="off">
+          <div class="autocomplete-drop" id="dest-drop" hidden></div>
+        </div>
+        <input type="hidden" id="dest_lat" name="dest_lat">
+        <input type="hidden" id="dest_lon" name="dest_lon">
       </div>
       <div>
         <label for="date">Date</label>
@@ -218,6 +253,12 @@
 
     const params = new URLSearchParams({ origin, destination, depart_after: departAfter });
     if (date) params.set('date', date);
+    const oLat = document.getElementById('origin_lat').value;
+    const oLon = document.getElementById('origin_lon').value;
+    const dLat = document.getElementById('dest_lat').value;
+    const dLon = document.getElementById('dest_lon').value;
+    if (oLat && oLon) { params.set('origin_lat', oLat); params.set('origin_lon', oLon); }
+    if (dLat && dLon) { params.set('dest_lat', dLat); params.set('dest_lon', dLon); }
 
     es = new EventSource(`/search?${params}`);
 
@@ -274,7 +315,7 @@
       const d2p = r.drive_to_port;
       html += leg('&#x1F697;', 'Drive to port',
         `${escHtml(d2p.duration_display)} &rarr; ${escHtml(d2p.port_name)}`,
-        `${d2p.distance_km}&thinsp;km`);
+        `${d2p.approximate ? '~' : ''}${d2p.distance_km}&thinsp;km`);
 
       const f = r.ferry;
       html += leg('&#x26F4;&#xFE0F;', 'Ferry',
@@ -284,7 +325,7 @@
       const dfp = r.drive_from_port;
       html += leg('&#x1F697;', 'Drive to dest',
         `${escHtml(dfp.duration_display)} from ${escHtml(dfp.port_name)}`,
-        `${dfp.distance_km}&thinsp;km`);
+        `${dfp.approximate ? '~' : ''}${dfp.distance_km}&thinsp;km`);
 
       html += `</div>`;
     });
@@ -308,6 +349,90 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+</script>
+<script>
+  // Croatia bounding box for Photon suggestions
+  const PHOTON_BBOX = 'bbox=13.5,42.4,19.5,46.6';
+
+  function setupAutocomplete(inputId, latId, lonId, dropId) {
+    const input = document.getElementById(inputId);
+    const latEl = document.getElementById(latId);
+    const lonEl = document.getElementById(lonId);
+    const drop = document.getElementById(dropId);
+    let timer = null;
+    let items = [];
+    let activeIdx = -1;
+
+    input.addEventListener('input', () => {
+      latEl.value = '';
+      lonEl.value = '';
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2) { hideDrop(); return; }
+      timer = setTimeout(() => fetchSuggestions(q), 300);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setActive(activeIdx + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(activeIdx - 1); }
+      else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); selectItem(items[activeIdx]); }
+      else if (e.key === 'Escape') { hideDrop(); }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !drop.contains(e.target)) hideDrop();
+    });
+
+    async function fetchSuggestions(q) {
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&${PHOTON_BBOX}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        renderDrop(data.features || []);
+      } catch { hideDrop(); }
+    }
+
+    function renderDrop(features) {
+      items = features.map(f => {
+        const p = f.properties;
+        const label = [p.name, p.city || p.county, p.country].filter(Boolean).join(', ');
+        return { label, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+      });
+      if (!items.length) { hideDrop(); return; }
+      activeIdx = -1;
+      drop.innerHTML = items.map((it, i) =>
+        `<div class="ac-item" data-i="${i}">${escHtml(it.label)}</div>`
+      ).join('');
+      drop.removeAttribute('hidden');
+      drop.querySelectorAll('.ac-item').forEach(el =>
+        el.addEventListener('click', () => selectItem(items[+el.dataset.i]))
+      );
+    }
+
+    function setActive(idx) {
+      const els = drop.querySelectorAll('.ac-item');
+      if (!els.length) return;
+      activeIdx = Math.max(0, Math.min(idx, els.length - 1));
+      els.forEach((el, i) => el.classList.toggle('ac-active', i === activeIdx));
+    }
+
+    function selectItem(item) {
+      input.value = item.label;
+      latEl.value = item.lat;
+      lonEl.value = item.lon;
+      hideDrop();
+    }
+
+    function hideDrop() {
+      drop.setAttribute('hidden', '');
+      items = [];
+      activeIdx = -1;
+    }
+  }
+
+  setupAutocomplete('origin', 'origin_lat', 'origin_lon', 'origin-drop');
+  setupAutocomplete('destination', 'dest_lat', 'dest_lon', 'dest-drop');
 </script>
 <script src="/static/layout.js"></script>
 </body>

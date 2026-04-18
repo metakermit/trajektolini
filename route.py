@@ -12,6 +12,7 @@ import argparse
 import csv
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -25,9 +26,24 @@ import requests
 GTFS_ZIP = Path(os.environ.get("GTFS_ZIP_PATH", "gtfs/jadrolinija_gtfs.zip"))
 PORTS_JSON = Path(os.environ.get("PORTS_JSON_PATH", "ports.json"))
 PHOTON = "https://photon.komoot.io/api/"
-OVERPASS = "https://overpass-api.de/api/interpreter"
 OSRM = "https://router.project-osrm.org/route/v1/driving"
 HEADERS = {"User-Agent": "jadrolinija-route/0.1"}
+
+_OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(dlon / 2) ** 2)
+    return R * 2 * math.asin(math.sqrt(a))
 
 
 class RouteError(Exception):
@@ -146,26 +162,47 @@ def load_gtfs(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 def get_island_from_osm(lat: float, lon: float) -> str | None:
-    """Return the name of the island containing (lat, lon), or None if not on an island."""
+    """Return the name of the island containing (lat, lon), or None if not on an island.
+
+    Tries multiple Overpass endpoints before falling back to a nearest-port heuristic.
+    """
     query = (
         f"[out:json];"
         f"is_in({lat},{lon})->.a;"
         f"rel(pivot.a)[\"place\"=\"island\"];"
         f"out tags;"
     )
-    for attempt in range(3):
-        try:
-            r = requests.post(OVERPASS, data={"data": query}, headers=HEADERS, timeout=20)
-            if r.status_code == 429 or not r.text.strip().startswith("{"):
+    for endpoint in _OVERPASS_ENDPOINTS:
+        for attempt in range(2):
+            try:
+                r = requests.post(endpoint, data={"data": query}, headers=HEADERS, timeout=20)
+                if r.status_code == 429 or not r.text.strip().startswith("{"):
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                elements = r.json().get("elements", [])
+                if elements:
+                    return elements[0].get("tags", {}).get("name")
+                return None  # on mainland
+            except requests.exceptions.RequestException:
                 time.sleep(5 * (attempt + 1))
-                continue
-            elements = r.json().get("elements", [])
-            if elements:
-                return elements[0].get("tags", {}).get("name")
-            return None  # on mainland
-        except requests.exceptions.RequestException:
-            time.sleep(5 * (attempt + 1))
-    raise RouteError("Overpass API unavailable after retries. Please try again shortly.")
+    return _island_from_nearest_port(lat, lon)
+
+
+def _island_from_nearest_port(lat: float, lon: float) -> str | None:
+    """Fallback: infer island membership from the nearest Jadrolinija port in ports.json."""
+    if not PORTS_JSON.exists():
+        raise RouteError("Overpass API unavailable. Please try again shortly.")
+    with open(PORTS_JSON, encoding="utf-8") as f:
+        ports = json.load(f)
+    if not ports:
+        raise RouteError("Overpass API unavailable. Please try again shortly.")
+    nearest = min(ports, key=lambda p: _haversine_km(lat, lon, p["lat"], p["lon"]))
+    if _haversine_km(lat, lon, nearest["lat"], nearest["lon"]) > 50:
+        raise RouteError(
+            "Overpass API unavailable and destination is too far from any known port. "
+            "Please try again shortly."
+        )
+    return (nearest.get("island") or "").strip() or None
 
 
 def geocode(query: str) -> tuple[float, float, str]:
@@ -249,18 +286,9 @@ def arrival_datetime(dep_date: str, dep_time_gtfs: str, duration_s: float) -> da
 def nearest_stops(lat: float, lon: float, stops: dict[str, Stop],
                   max_km: float = 30.0) -> list[tuple[float, Stop]]:
     """Return stops within max_km, sorted by distance."""
-    import math
-
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371
-        dlat = math.radians(lat2 - lat1)
-        dlon = math.radians(lon2 - lon1)
-        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-        return R * 2 * math.asin(math.sqrt(a))
-
     result = []
     for stop in stops.values():
-        d = haversine(lat, lon, stop.lat, stop.lon)
+        d = _haversine_km(lat, lon, stop.lat, stop.lon)
         if d <= max_km:
             result.append((d, stop))
     result.sort()
@@ -318,12 +346,23 @@ def find_routes(
         Build route candidates for one ferry direction.
         island_coords / mainland_coords are the actual origin/destination coords.
         """
-        # Drive from island location to each island port
+        # Drive from island location to each island port.
+        # When OSRM can't route (e.g. Cres has no road to mainland so the
+        # island network may be unreachable by the public OSRM server), fall
+        # back to a straight-line haversine estimate at 40 km/h average.
         island_drives: dict[str, dict] = {}
         for stop_id in island_port_ids:
-            result = drive(island_coords, (stops[stop_id].lat, stops[stop_id].lon))
-            if result is not None:
-                island_drives[stop_id] = result
+            port = stops[stop_id]
+            result = drive(island_coords, (port.lat, port.lon))
+            if result is None:
+                km = _haversine_km(island_coords[0], island_coords[1], port.lat, port.lon)
+                dist_m = km * 1.4 * 1000
+                result = {
+                    "duration_s": dist_m / 1000 / 40 * 3600,
+                    "distance_m": dist_m,
+                    "approximate": True,
+                }
+            island_drives[stop_id] = result
 
         candidates: list[Route] = []
 
@@ -479,6 +518,7 @@ def route_to_dict(route: Route) -> dict:
             "duration_display": seconds_to_hhmm(route.drive_to_port["duration_s"]),
             "distance_km": round(route.drive_to_port["distance_m"] / 1000),
             "port_name": route.dep_port.name,
+            "approximate": route.drive_to_port.get("approximate", False),
         },
         "ferry": {
             "dep_time": gtfs_display_time(ferry.dep_time),
@@ -493,6 +533,7 @@ def route_to_dict(route: Route) -> dict:
             "duration_display": seconds_to_hhmm(route.drive_from_port["duration_s"]),
             "distance_km": round(route.drive_from_port["distance_m"] / 1000),
             "port_name": route.arr_port.name,
+            "approximate": route.drive_from_port.get("approximate", False),
         },
     }
 

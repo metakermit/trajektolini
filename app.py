@@ -80,6 +80,10 @@ async def search(
     travel_date: str = Query(default=None, alias="date"),
     depart_after: str = Query(default="00:00"),
     results: int = Query(default=3, ge=1, le=10),
+    origin_lat: float | None = Query(default=None),
+    origin_lon: float | None = Query(default=None),
+    dest_lat: float | None = Query(default=None),
+    dest_lon: float | None = Query(default=None),
 ):
     async def generate():
         def event(data: dict) -> str:
@@ -101,25 +105,31 @@ async def search(
             return
 
         try:
-            yield event({"type": "progress", "message": f"Geocoding \"{origin}\"…"})
-            orig_lat, orig_lon, orig_name = await asyncio.to_thread(geocode, origin)
+            if origin_lat is not None and origin_lon is not None:
+                olat, olon = origin_lat, origin_lon
+            else:
+                yield event({"type": "progress", "message": f"Geocoding \"{origin}\"…"})
+                olat, olon, _ = await asyncio.to_thread(geocode, origin)
 
-            yield event({"type": "progress", "message": f"Geocoding \"{destination}\"…"})
-            dest_lat, dest_lon, dest_name = await asyncio.to_thread(geocode, destination)
+            if dest_lat is not None and dest_lon is not None:
+                dlat, dlon = dest_lat, dest_lon
+            else:
+                yield event({"type": "progress", "message": f"Geocoding \"{destination}\"…"})
+                dlat, dlon, _ = await asyncio.to_thread(geocode, destination)
 
             yield event({"type": "progress", "message": "Identifying destination island…"})
-            osm_island = await asyncio.to_thread(get_island_from_osm, dest_lat, dest_lon)
+            osm_island = await asyncio.to_thread(get_island_from_osm, dlat, dlon)
 
             origin_island = None
             if not osm_island:
                 yield event({"type": "progress", "message": "Identifying origin island…"})
-                origin_island = await asyncio.to_thread(get_island_from_osm, orig_lat, orig_lon)
+                origin_island = await asyncio.to_thread(get_island_from_osm, olat, olon)
 
             yield event({"type": "progress", "message": "Calculating routes…"})
             routes = await asyncio.to_thread(
                 find_routes,
-                (orig_lat, orig_lon),
-                (dest_lat, dest_lon),
+                (olat, olon),
+                (dlat, dlon),
                 _gtfs,
                 parsed_date,
                 depart_after_secs,

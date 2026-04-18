@@ -167,6 +167,47 @@ class TestRouteMartinscicaZagreb:
             )
 
 
+class TestRouteZagrebCres:
+    """Zagreb (mainland) → Cres (island) — tests routing to a ferry-only island."""
+
+    ZAGREB = (45.815, 15.982)
+    CRES = (44.960, 14.410)
+
+    def test_finds_routes(self, gtfs):
+        with patch("route.drive", side_effect=haversine_drive):
+            routes = find_routes(self.ZAGREB, self.CRES, gtfs, TEST_DATE,
+                                 osm_island="Cres")
+        assert len(routes) >= 1
+
+    def test_all_routes_arrive_on_cres(self, gtfs):
+        with patch("route.drive", side_effect=haversine_drive):
+            routes = find_routes(self.ZAGREB, self.CRES, gtfs, TEST_DATE,
+                                 osm_island="Cres")
+        cres_ports = {"CRE", "MAR", "MER", "POR"}
+        for r in routes:
+            assert r.arr_port.stop_id in cres_ports, (
+                f"Expected arrival at a Cres port, got {r.arr_port.stop_id}"
+            )
+
+    def test_finds_routes_when_osrm_fails_on_island(self, gtfs):
+        """Haversine fallback must kick in when OSRM can't route island-internally."""
+        def drive_no_short_routes(origin, dest):
+            # Simulate OSRM failure for short island-internal legs (<80 km road distance)
+            result = haversine_drive(origin, dest)
+            if result["distance_m"] < 80_000:
+                return None
+            return result
+
+        with patch("route.drive", side_effect=drive_no_short_routes):
+            routes = find_routes(self.ZAGREB, self.CRES, gtfs, TEST_DATE,
+                                 osm_island="Cres")
+        assert len(routes) >= 1
+        # At least one leg should be marked approximate (island-internal fallback used)
+        assert any(
+            r.drive_from_port.get("approximate") for r in routes
+        ), "Expected at least one route with an approximate island-internal leg"
+
+
 class TestRouteRijekaCres:
     """Rijeka → Cres (island) — tests northern Adriatic routing."""
 
