@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import tempfile
 from contextlib import asynccontextmanager
@@ -10,10 +11,19 @@ from datetime import date
 from pathlib import Path
 
 import boto3
+import sentry_sdk
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+if _sentry_dsn := os.environ.get("SENTRY_DSN"):
+    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.2)
 
 from route import (
     GTFS_ZIP, RouteError,

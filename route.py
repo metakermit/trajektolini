@@ -12,6 +12,7 @@ import argparse
 import csv
 import io
 import json
+import logging
 import math
 import os
 import sys
@@ -22,6 +23,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import requests
+import sentry_sdk
+
+_log = logging.getLogger(__name__)
 
 GTFS_ZIP = Path(os.environ.get("GTFS_ZIP_PATH", "gtfs/jadrolinija_gtfs.zip"))
 PORTS_JSON = Path(os.environ.get("PORTS_JSON_PATH", "ports.json"))
@@ -177,14 +181,18 @@ def get_island_from_osm(lat: float, lon: float) -> str | None:
             try:
                 r = requests.post(endpoint, data={"data": query}, headers=HEADERS, timeout=20)
                 if r.status_code == 429 or not r.text.strip().startswith("{"):
+                    _log.warning("Overpass %s returned HTTP %d (attempt %d)", endpoint, r.status_code, attempt + 1)
                     time.sleep(5 * (attempt + 1))
                     continue
                 elements = r.json().get("elements", [])
                 if elements:
                     return elements[0].get("tags", {}).get("name")
                 return None  # on mainland
-            except requests.exceptions.RequestException:
+            except requests.exceptions.RequestException as e:
+                _log.warning("Overpass %s unreachable (attempt %d): %s", endpoint, attempt + 1, e)
+                sentry_sdk.capture_exception(e)
                 time.sleep(5 * (attempt + 1))
+    _log.warning("All Overpass mirrors failed for (%.4f, %.4f); using ports heuristic", lat, lon)
     return _island_from_nearest_port(lat, lon)
 
 
@@ -225,7 +233,9 @@ def geocode(query: str) -> tuple[float, float, str]:
             return float(lat), float(lon), name
         except RouteError:
             raise
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            _log.warning("Photon geocode failed (attempt %d): %s", attempt + 1, e)
+            sentry_sdk.capture_exception(e)
             time.sleep(5 * (attempt + 1))
     raise RouteError("Geocoding service unavailable. Please try again in a moment.")
 
@@ -239,9 +249,12 @@ def drive(origin: tuple[float, float], destination: tuple[float, float]) -> dict
     url = f"{OSRM}/{origin[1]},{origin[0]};{destination[1]},{destination[0]}"
     try:
         r = requests.get(url, params={"overview": "false"}, headers=HEADERS, timeout=10)
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        _log.warning("OSRM request failed: %s", e)
+        sentry_sdk.capture_exception(e)
         return None
     if r.status_code != 200:
+        _log.warning("OSRM returned HTTP %d", r.status_code)
         return None
     data = r.json()
     if data.get("code") != "Ok":
