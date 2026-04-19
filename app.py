@@ -82,6 +82,9 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), na
 async def index():
     return (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
 
+@app.get("/sentry-debug")
+async def trigger_error():
+    division_by_zero = 1 / 0
 
 @app.get("/search")
 async def search(

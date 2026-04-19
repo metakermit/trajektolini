@@ -1,12 +1,5 @@
-services:
-  - type: web
-    name: trajektolini
-    runtime: python
-    region: frankfurt
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-    plan: starter
-    autoDeploy: false
+envVarGroups:
+  - name: trajektolini-prod
     envVars:
       - key: R2_ACCOUNT_ID
         sync: false
@@ -16,6 +9,19 @@ services:
         sync: false
       - key: R2_BUCKET
         sync: false
+
+services:
+  - type: web
+    name: trajektolini
+    runtime: python
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    autoDeploy: false
+    envVarGroups:
+      - trajektolini-prod
+    envVars:
       - key: SENTRY_DSN
         sync: false
 
@@ -26,12 +32,5 @@ services:
     buildCommand: pip install -r requirements.txt
     schedule: "0 3 * * *"
     startCommand: python gtfs.py && python upload_gtfs.py
-    envVars:
-      - key: R2_ACCOUNT_ID
-        sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: R2_BUCKET
-        sync: false
+    envVarGroups:
+      - trajektolini-prod
